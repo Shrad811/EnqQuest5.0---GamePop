@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clock Rider</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e7f2f3;--sky1:#a9d8ea;--sky2:#eaf6f2;--h1:#9fcfc0;--h2:#6fae9c;--gnd:#2c4a42;--grass:#6dc16a;--ink:#17302b;--bike:#e8531f;--ok:#1d9a55;--bad:#c62828;--card:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1624;--sky1:#0f2038;--sky2:#27456b;--h1:#1c3a58;--h2:#16304a;--gnd:#09141a;--grass:#3fae6e;--ink:#e6f1ee;--bike:#ff8a3d;--ok:#4ccf8a;--bad:#ff6b6b;--card:#13263a}}
+:root[data-theme="dark"]{--bg:#0b1624;--sky1:#0f2038;--sky2:#27456b;--h1:#1c3a58;--h2:#16304a;--gnd:#09141a;--grass:#3fae6e;--ink:#e6f1ee;--bike:#ff8a3d;--ok:#4ccf8a;--bad:#ff6b6b;--card:#13263a}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif;display:flex;justify-content:center}
+main{width:100%;max-width:480px;padding:12px;display:flex;flex-direction:column;gap:10px;user-select:none;-webkit-user-select:none}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+h1{margin:0;font-size:32px;line-height:1;font-weight:700}
+.msg{margin:3px 0 0;font-size:17px;font-weight:600;min-height:21px}
+.clk{font-size:64px;font-weight:700;line-height:.85;font-variant-numeric:tabular-nums}
+.clk small{font-size:.38em;margin-left:2px}
+.clk.low{color:var(--bad)}
+.track{position:relative;height:12px;background:var(--card);border:2px solid var(--ink);border-radius:7px;overflow:hidden}
+.track i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--bike)}
+.track b{position:absolute;top:0;bottom:0;width:3px;background:var(--ink)}
+.tl{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-top:-6px}
+canvas{width:100%;display:block;border:2px solid var(--ink);border-radius:8px;touch-action:none}
+.ctl{display:flex;justify-content:space-between;gap:10px}
+.grp{display:flex;gap:8px;flex:1}
+.btn{flex:1;min-height:76px;font:700 21px "Barlow Condensed","Arial Narrow",Arial,sans-serif;line-height:1.05;color:var(--ink);background:var(--card);border:3px solid var(--ink);border-radius:14px;touch-action:none;cursor:pointer}
+.btn.on{background:var(--ink);color:var(--bg)}
+.btn.gas{background:var(--bike);color:#fff;border-color:var(--ink)}
+.btn.gas.on{filter:brightness(.8)}
+.btn small{display:block;font-size:13px;font-weight:600;opacity:.8}
+.btn:focus-visible{outline:3px solid var(--bike);outline-offset:2px}
+.keys{margin:0;font-size:14px;opacity:.8;text-align:center}
+.ov{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 94%,transparent);display:flex;align-items:center;justify-content:center;padding:22px;z-index:5}
+.ov[hidden]{display:none}
+.card{max-width:380px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.card h2{margin:0;font-size:42px;line-height:1}
+.card p{margin:0;font-size:19px;line-height:1.4}
+.go{font:700 22px "Barlow Condensed","Arial Narrow",Arial,sans-serif;background:var(--bike);color:#fff;border:3px solid var(--ink);border-radius:12px;padding:12px 30px;cursor:pointer}
+.go:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Clock Rider</h1><p class="msg" id="msg">Hold GAS to start the clock</p></div>
+    <div class="clk" id="clk"><span id="sec">30.0</span><small>s</small></div>
+  </header>
+  <div class="track" id="track"><i id="prog"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
+  <div class="tl"><span>Start</span><span>Flags: +8 seconds each</span><span>Finish</span></div>
+  <canvas id="cv" aria-label="Bike track"></canvas>
+  <div class="ctl">
+    <div class="grp">
+      <button class="btn" data-k="back">Lean back<small>nose up</small></button>
+      <button class="btn" data-k="fwd">Lean forward<small>nose down</small></button>
+    </div>
+    <div class="grp">
+      <button class="btn" data-k="brake">Brake</button>
+      <button class="btn gas" data-k="gas">GAS</button>
+    </div>
+  </div>
+  <p class="keys">Keyboard: Up or W gas. Down or S brake. Left or A lean back. Right or D lean forward.</p>
+</main>
+
+<div class="ov" id="ov">
+  <div class="card"><h2 id="ovT"></h2><p id="ovP"></p><button class="go" id="ovB"></button></div>
+</div>
+
+<script>
+(function(){
+var G=900,R=12,I=2600,KS=2200,DRIVE=700,LEAN=15000,STEP=1/240;
+var START_T=30,BONUS=8,PEN=3,FINISH=10000,CP=[2500,5000,7500];
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var secEl=document.getElementById('sec'),clkEl=document.getElementById('clk'),progEl=document.getElementById('prog'),msgEl=document.getElementById('msg');
+var ov=document.getElementById('ov'),ovT=document.getElementById('ovT'),ovP=document.getElementById('ovP'),ovB=document.getElementById('ovB');
+var inp={gas:0,brake:0,back:0,fwd:0}, K={}, b, state='idle', timeLeft, elapsed, cpIdx, inv, acc=0, last=0, camX=0, camY=0, cw=400, ch=280, dpr=1, fr=0, ovCb=null, spin=0, msgT=0;
+
+function ter(x){
+  var f=Math.min(1,Math.max(0,x/1500));
+  return 500-f*(55*Math.sin(x/300)+30*Math.sin(x/130+1.3))-f*60*Math.pow(Math.max(0,Math.sin(x/520+.6)),6);
+}
+function slope(x){return (ter(x+1)-ter(x-1))/2;}
+function readColors(){var s=getComputedStyle(document.documentElement);['sky1','sky2','h1','h2','gnd','grass','ink','bike','ok','bad','card'].forEach(function(n){K[n]=s.getPropertyValue('--'+n).trim();});}
+function say(t){msgEl.textContent=t;}
+
+function spawn(x){
+  b={x:x,y:ter(x)-36,vx:0,vy:0,a:Math.atan(slope(x)),w:0}; inv=.8; camX=b.x-cw*.3; camY=b.y-ch*.6;
+}
+function reset(){
+  spawn(100); timeLeft=START_T; elapsed=0; cpIdx=-1; state='ready'; say('Hold GAS to start the clock');
+}
+function crash(){
+  timeLeft-=PEN; spawn(cpIdx>=0?CP[cpIdx]:100); say('Crashed! -'+PEN+' seconds. Back to the last flag.'); msgT=2.5;
+}
+
+function step(dt){
+  var c=Math.cos(b.a),s=Math.sin(b.a),ax=-.9*b.vx,ay=G-.15*b.vy,tq=0;
+  for(var i=0;i<2;i++){
+    var lx=i?30:-30, rx=c*lx-s*18, ry=s*lx+c*18, px=b.x+rx, py=b.y+ry, pen=py+R-ter(px);
+    if(pen>0){
+      var wvx=b.vx-b.w*ry, wvy=b.vy+b.w*rx, sl=slope(px), tl=Math.sqrt(1+sl*sl), tx=1/tl, ty=sl/tl, nx=ty, ny=-tx;
+      var F=Math.min(7000,Math.max(0,KS*pen-70*(wvx*nx+wvy*ny))), ft=0;
+      if(i===0&&inp.gas)ft+=DRIVE;
+      if(inp.brake)ft-=Math.max(-500,Math.min(500,(wvx*tx+wvy*ty)*6));
+      var fx=F*nx+ft*tx, fy=F*ny+ft*ty;
+      ax+=fx; ay+=fy; tq+=rx*fy-ry*fx;
+    }
+  }
+  tq+=(inp.fwd-inp.back)*LEAN;
+  b.vx+=ax*dt; b.vy+=ay*dt; b.w+=tq/I*dt; b.w-=b.w*1.2*dt;
+  b.x+=b.vx*dt; b.y+=b.vy*dt; b.a+=b.w*dt; spin+=b.vx/R*dt;
+  if(inv>0){inv-=dt;}
+  else{var hx=b.x+c*4+s*34, hy=b.y+s*4-c*34; if(hy+5>ter(hx))crash();}
+}
+
+function show(t,p,btn,cb){ovT.textContent=t;ovP.innerHTML=p;ovB.textContent=btn;ovCb=cb;ov.hidden=false;ovB.focus();}
+ovB.addEventListener('click',function(){ov.hidden=true;var cb=ovCb;ovCb=null;if(cb)cb();});
+
+function finish(){
+  state='over'; var best=0; try{best=parseFloat(localStorage.getItem('clockrider-best'))||0;}catch(e){}
+  var nb=!best||elapsed<best; if(nb){best=elapsed;try{localStorage.setItem('clockrider-best',String(elapsed));}catch(e){}}
+  show(nb?'New best time':'Finished!','Ride time: <b>'+elapsed.toFixed(1)+' s</b>. Clock left: '+Math.max(0,timeLeft).toFixed(1)+' s.<br>Best ride time: '+best.toFixed(1)+' s.<br><br>Faster rides score better. Can you beat it?','Ride again',reset);
+}
+function timeUp(){
+  state='over'; var pct=Math.max(0,Math.min(99,Math.round(b.x/FINISH*100)));
+  show("Time's up",'You reached '+pct+'% of the track.<br>Tip: hold GAS on flat ground, lean back going up ramps, lean forward to land flat.','Try again',reset);
+}
+
+function bind(){
+  var map={ArrowUp:'gas',w:'gas',W:'gas',ArrowDown:'brake',s:'brake',S:'brake',ArrowLeft:'back',a:'back',A:'back',ArrowRight:'fwd',d:'fwd',D:'fwd'};
+  addEventListener('keydown',function(e){var k=map[e.key];if(k){e.preventDefault();inp[k]=1;sync();}});
+  addEventListener('keyup',function(e){var k=map[e.key];if(k){inp[k]=0;sync();}});
+  document.querySelectorAll('.btn').forEach(function(el){
+    var k=el.dataset.k;
+    el.addEventListener('pointerdown',function(e){e.preventDefault();inp[k]=1;sync();});
+    ['pointerup','pointerleave','pointercancel'].forEach(function(n){el.addEventListener(n,function(){inp[k]=0;sync();});});
+  });
+  addEventListener('blur',function(){inp.gas=inp.brake=inp.back=inp.fwd=0;sync();});
+}
+function sync(){document.querySelectorAll('.btn').forEach(function(el){el.classList.toggle('on',!!inp[el.dataset.k]);});}
+
+function fit(){
+  var w=Math.min(cv.parentElement.clientWidth-24,456); cw=Math.max(260,w); ch=Math.round(cw*.66); dpr=window.devicePixelRatio||1;
+  cv.width=cw*dpr; cv.height=ch*dpr; cv.style.height=ch+'px';
+}
+addEventListener('resize',fit);
+
+function hills(base,amp,fq,par,col){
+  ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(0,ch);
+  for(var sx=0;sx<=cw;sx+=8){var wx=camX*par+sx; ctx.lineTo(sx,base+amp*Math.sin(wx*fq)+amp*.5*Math.sin(wx*fq*2.7+1));}
+  ctx.lineTo(cw,ch); ctx.fill();
+}
+function flag(x,done,fin){
+  var sx=x-camX; if(sx<-60||sx>cw+60)return; var gy=ter(x)-camY;
+  ctx.strokeStyle=K.ink; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(sx,gy); ctx.lineTo(sx,gy-90); ctx.stroke();
+  if(fin){
+    for(var r=0;r<3;r++)for(var q=0;q<5;q++){ctx.fillStyle=(r+q)%2?K.card:K.ink;ctx.fillRect(sx+q*9,gy-90+r*9,9,9);}
+    ctx.strokeStyle=K.ink; ctx.lineWidth=2; ctx.strokeRect(sx,gy-90,45,27);
+  } else {
+    ctx.fillStyle=done?K.ok:K.bike; ctx.beginPath(); ctx.moveTo(sx,gy-90); ctx.lineTo(sx+34,gy-77); ctx.lineTo(sx,gy-64); ctx.fill();
+  }
+}
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  var gr=ctx.createLinearGradient(0,0,0,ch); gr.addColorStop(0,K.sky1); gr.addColorStop(1,K.sky2);
+  ctx.fillStyle=gr; ctx.fillRect(0,0,cw,ch);
+  hills(ch*.55-(camY-380)*.1,26,.004,.12,K.h1);
+  hills(ch*.68-(camY-380)*.2,22,.007,.3,K.h2);
+  ctx.beginPath(); ctx.moveTo(0,ch);
+  for(var sx=0;sx<=cw;sx+=4)ctx.lineTo(sx,ter(camX+sx)-camY);
+  ctx.lineTo(cw,ch); ctx.closePath(); ctx.fillStyle=K.gnd; ctx.fill();
+  ctx.beginPath();
+  for(sx=0;sx<=cw;sx+=4){var yy=ter(camX+sx)-camY; sx?ctx.lineTo(sx,yy):ctx.moveTo(sx,yy);}
+  ctx.strokeStyle=K.grass; ctx.lineWidth=5; ctx.stroke();
+  CP.forEach(function(x,i){flag(x,i<=cpIdx,false);});
+  flag(FINISH,false,true);
+  ctx.save(); ctx.translate(b.x-camX,b.y-camY); ctx.rotate(b.a);
+  if(inv>0&&Math.floor(inv*12)%2)ctx.globalAlpha=.45;
+  ctx.lineWidth=3; ctx.strokeStyle=K.ink;
+  [-30,30].forEach(function(lx){
+    ctx.beginPath(); ctx.arc(lx,18,R,0,7); ctx.stroke();
+    ctx.beginPath(); for(var k=0;k<3;k++){var an=spin+k*Math.PI/3;ctx.moveTo(lx+Math.cos(an)*R,18+Math.sin(an)*R);ctx.lineTo(lx-Math.cos(an)*R,18-Math.sin(an)*R);} ctx.lineWidth=1.5; ctx.stroke(); ctx.lineWidth=3;
+  });
+  ctx.strokeStyle=K.bike; ctx.lineWidth=5; ctx.lineJoin='round'; ctx.beginPath();
+  ctx.moveTo(-30,18); ctx.lineTo(-6,16); ctx.lineTo(-12,-6); ctx.lineTo(12,-8); ctx.lineTo(30,18); ctx.moveTo(12,-8); ctx.lineTo(18,-18); ctx.lineTo(8,-20); ctx.stroke();
+  ctx.strokeStyle=K.ink; ctx.lineWidth=7; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-10,-8); ctx.lineTo(1,-26); ctx.moveTo(1,-24); ctx.lineTo(10,-20); ctx.stroke();
+  ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(-6,-6); ctx.lineTo(4,10); ctx.stroke();
+  ctx.fillStyle=K.ink; ctx.beginPath(); ctx.arc(4,-34,7,0,7); ctx.fill();
+  ctx.fillStyle=K.bike; ctx.beginPath(); ctx.arc(4,-36,7,Math.PI,0); ctx.fill();
+  ctx.restore();
+}
+
+function hud(){
+  secEl.textContent=Math.max(0,timeLeft).toFixed(1); clkEl.classList.toggle('low',timeLeft<=8);
+  progEl.style.width=Math.max(0,Math.min(100,b.x/FINISH*100))+'%';
+}
+function frame(now){
+  var dt=Math.min(.05,(now-last)/1000); last=now;
+  if(state==='ready'&&inp.gas&&ov.hidden){state='run';say('Go! Reach the flags to add time.');}
+  if(state==='ready'||state==='run'){
+    acc+=dt; while(acc>=STEP){step(STEP);acc-=STEP;}
+    camX+=(b.x-cw*.3-camX)*Math.min(1,dt*8); camY+=(b.y-ch*.6-camY)*Math.min(1,dt*4);
+  }
+  if(state==='run'){
+    timeLeft-=dt; elapsed+=dt;
+    if(msgT>0){msgT-=dt;}
+    for(var i=0;i<CP.length;i++)if(b.x>=CP[i]&&i>cpIdx){cpIdx=i;timeLeft+=BONUS;say('Flag '+(i+1)+'! +'+BONUS+' seconds.');msgT=2.5;}
+    if(b.x>=FINISH)finish(); else if(timeLeft<=0){timeLeft=0;timeUp();}
+  }
+  if(!(fr++%30))readColors();
+  draw(); hud(); requestAnimationFrame(frame);
+}
+
+readColors(); bind(); fit(); reset(); state='idle';
+show('How to play','<b>Goal:</b> reach the checkered finish before the clock hits zero.<br><br>1. Hold <b>GAS</b> to ride. The clock starts when you do.<br>2. In the air, use <b>Lean back</b> and <b>Lean forward</b> to land on both wheels.<br>3. Each flag you pass adds 8 seconds.<br>4. If your head touches the ground you crash: lose 3 seconds and restart at the last flag.','Got it, ride',function(){state='ready';});
+requestAnimationFrame(function(n){last=n;frame(n);});
+})();
+</script>
+</body>
+</html>
