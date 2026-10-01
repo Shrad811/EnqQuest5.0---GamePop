@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Echo Loop</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>ECHO LOOP</h1>
+    <div id="lvl"></div>
+    <div id="coins">🪙 0/0</div>
+    <div id="loops" title="Loops left"></div>
+  </header>
+
+  <div id="hint"></div>
+  <div id="bar"><div id="fill"></div><span id="time"></span></div>
+
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="toast"></div>
+  </div>
+
+  <div id="tools">
+    <button id="rewind" class="big">⏪ Rewind (Enter)</button>
+    <button id="restart">↻ Restart</button>
+    <button id="menuBtn">☰ Levels</button>
+    <button id="help">❓ Help</button>
+    <button id="skip">⏭ Skip level</button>
+  </div>
+
+  <div id="pad">
+    <div class="dpad">
+      <button data-k="up">▲</button>
+      <button data-k="left">◀</button>
+      <button data-k="down">▼</button>
+      <button data-k="right">▶</button>
+    </div>
+    <button id="jump" data-k="jump">🦘<br>JUMP</button>
+  </div>
+</main>
+
+<div id="card" class="ov">
+  <div class="box">
+    <h2 id="ct"></h2>
+    <p id="cg"></p>
+    <ul id="cl"></ul>
+    <div id="legend">
+      <span>🟠 Ring: stand on it to open the purple door</span>
+      <span>🔵 Cyan ring: opens the cyan door</span>
+      <span>🔥 Lava: jump over it!</span>
+      <span>🟢 Spring: launches you very far</span>
+      <span>⚠️ Spikes: pop up and down, wait or jump</span>
+      <span>🪙 Coins: collect all for a star</span>
+    </div>
+    <p class="keys">Move: arrows / WASD &nbsp;|&nbsp; Jump: Space &nbsp;|&nbsp; Rewind: Enter</p>
+    <button id="go" class="big"></button>
+    <button id="go2" class="alt"></button>
+  </div>
+</div>
+
+<div id="menu" class="ov">
+  <div class="box">
+    <h2>Choose a level</h2>
+    <div id="grid"></div>
+    <label class="chill"><input type="checkbox" id="chill"> 😌 Chill mode: 50% more time on every loop</label>
+    <button id="close" class="big">Close</button>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
