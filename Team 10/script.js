@@ -129,23 +129,96 @@ const unlocked = i => i === 0 || (SAVE.stars[i - 1] || 0) > 0;
 
 let li = 0, S = 'card', loop = 0, t = 0, p, rec, ghosts = [], open = false, open2 = false;
 let M, W, H, sx, sy, shake = 0, parts = [], jumpBuf = 0, acc = 0, last = 0, cardAct = null, card2Act = null;
+let hasSpikes = false, pOpen = false, pOpen2 = false;
 let coins = new Set(), total = 0, fails = 0, flashA = 0, menuPrev = 'card';
 const k = { left: 0, right: 0, up: 0, down: 0 };
 const lvTime = () => LEVELS[li].t * (SAVE.chill ? 1.5 : 1);
 const spikeOn = n => Math.floor(n / 40) % 2 === 1;
 
-// ---------- sound ----------
-let ac;
-function snd(f, d = 0.1, type = 'square') {
+// ---------- sound (Web Audio synth, no files needed) ----------
+if (SAVE.music === undefined) SAVE.music = true;
+let ac, master, dly, noiseBuf, nextNote = 0, noteI = 0;
+function audio() {
+  if (!ac) {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    master = ac.createGain(); master.gain.value = SAVE.mute ? 0 : 0.9;
+    const comp = ac.createDynamicsCompressor();
+    master.connect(comp); comp.connect(ac.destination);
+    dly = ac.createDelay(); dly.delayTime.value = 0.17;
+    const fb = ac.createGain(), wet = ac.createGain(); fb.gain.value = 0.28; wet.gain.value = 0.22;
+    dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(master);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function tone(f, d = 0.1, o = {}) {
   try {
-    ac = ac || new AudioContext();
-    const o = ac.createOscillator(), v = ac.createGain();
-    o.type = type; o.frequency.value = f; v.gain.value = 0.05;
-    o.connect(v); v.connect(ac.destination); o.start();
-    v.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + d);
-    o.stop(ac.currentTime + d);
+    const c = audio(), t0 = c.currentTime + (o.at || 0);
+    const osc = c.createOscillator(), v = c.createGain();
+    osc.type = o.type || 'square'; osc.frequency.setValueAtTime(f, t0);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + d);
+    v.gain.setValueAtTime(0.0001, t0);
+    v.gain.exponentialRampToValueAtTime(o.vol || 0.12, t0 + 0.008);
+    v.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    osc.connect(v); v.connect(master); if (o.echo) v.connect(dly);
+    osc.start(t0); osc.stop(t0 + d + 0.02);
   } catch (e) {}
 }
+function noise(d = 0.2, o = {}) {
+  try {
+    const c = audio(), t0 = c.currentTime + (o.at || 0);
+    const s = c.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = o.ft || 'bandpass';
+    f.frequency.setValueAtTime(o.f || 1000, t0);
+    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to, t0 + d);
+    const v = c.createGain();
+    v.gain.setValueAtTime(o.vol || 0.2, t0); v.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    s.connect(f); f.connect(v); v.connect(master); s.start(t0); s.stop(t0 + d + 0.02);
+  } catch (e) {}
+}
+const sfx = {
+  jump() { tone(280, 0.16, { to: 760, vol: 0.07 }); },
+  land() { noise(0.08, { ft: 'lowpass', f: 500, vol: 0.25 }); tone(140, 0.09, { type: 'sine', to: 60, vol: 0.2 }); },
+  step() { tone(90 + Math.random() * 30, 0.04, { type: 'triangle', vol: 0.05 }); },
+  spring() { tone(180, 0.4, { type: 'triangle', to: 1100, vol: 0.16, echo: 1 }); tone(360, 0.3, { type: 'sine', to: 1500, vol: 0.08, at: 0.05 }); },
+  coin(n) { const m = Math.pow(2, Math.min(n, 12) / 12); tone(988 * m, 0.07, { vol: 0.09 }); tone(1319 * m, 0.28, { vol: 0.09, at: 0.07, echo: 1 }); },
+  plate(on) { tone(on ? 520 : 360, 0.12, { type: 'triangle', vol: 0.14, to: on ? 780 : 240 }); if (on) tone(110, 0.35, { type: 'sawtooth', to: 220, vol: 0.07, at: 0.04 }); },
+  tick() { tone(1100, 0.03, { vol: 0.05 }); },
+  dieLava() { noise(0.55, { f: 2500, to: 150, vol: 0.4 }); tone(420, 0.5, { type: 'sawtooth', to: 70, vol: 0.15 }); },
+  dieSpike() { noise(0.12, { ft: 'highpass', f: 3000, vol: 0.3 }); tone(700, 0.25, { to: 90, vol: 0.14 }); },
+  rewind() { noise(0.45, { f: 200, to: 3500, vol: 0.3 }); for (let i = 0; i < 5; i++) tone(300 + i * 150, 0.09, { type: 'sine', vol: 0.09, at: i * 0.06 }); },
+  fail() { [392, 330, 262].forEach((f, i) => tone(f, 0.2, { type: 'triangle', vol: 0.12, at: i * 0.14 })); },
+  start() { [523, 659, 784].forEach((f, i) => tone(f, 0.12, { type: 'triangle', vol: 0.1, at: i * 0.07, echo: 1 })); },
+  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => { tone(f, 0.35, { type: 'triangle', vol: 0.12, at: i * 0.1, echo: 1 }); tone(f / 2, 0.35, { vol: 0.04, at: i * 0.1 }); }); },
+  click() { tone(820, 0.05, { type: 'triangle', vol: 0.07 }); }
+};
+// gentle looping background music (A minor), scheduled slightly ahead for steady timing
+const BASS = [55, 0, 55, 0, 65.41, 0, 65.41, 0, 49, 0, 49, 0, 43.65, 0, 43.65, 0];
+const ARP = [220, 261.6, 329.6, 261.6, 261.6, 329.6, 392, 329.6, 196, 246.9, 293.7, 246.9, 174.6, 220, 261.6, 220];
+function musicTick() {
+  if (!ac) return;
+  if (!SAVE.music || SAVE.mute || ac.state !== 'running') { nextNote = ac.currentTime; return; }
+  nextNote = Math.max(nextNote, ac.currentTime);
+  while (nextNote < ac.currentTime + 0.2) {
+    const i = noteI % 16, at = nextNote - ac.currentTime;
+    if (BASS[i]) tone(BASS[i], 0.3, { type: 'triangle', vol: 0.1, at });
+    tone(ARP[i], 0.12, { vol: 0.025, at, echo: 1 });
+    nextNote += 0.17; noteI++;
+  }
+}
+setInterval(musicTick, 60);
+const wake = () => { try { audio(); } catch (e) {} };
+addEventListener('pointerdown', wake); addEventListener('keydown', wake);
+addEventListener('click', e => { const b = e.target && e.target.closest && e.target.closest('button'); if (b && b.id !== 'go' && b.id !== 'go2') sfx.click(); });
+if (document.addEventListener) document.addEventListener('visibilitychange', () => { try { document.hidden ? ac.suspend() : ac.resume(); } catch (e) {} });
+function soundLabels() {
+  $('snd').textContent = SAVE.mute ? '🔇 Sound off' : '🔊 Sound on';
+  $('mus').textContent = SAVE.music ? '🎵 Music on' : '🎵 Music off';
+}
+$('snd').onclick = () => { SAVE.mute = !SAVE.mute; if (master) master.gain.value = SAVE.mute ? 0 : 0.9; persist(); soundLabels(); };
+$('mus').onclick = () => { SAVE.music = !SAVE.music; persist(); soundLabels(); };
 
 // ---------- helpers ----------
 function tile(x, y) { const r = M[Math.floor(y)]; return (r && r[Math.floor(x)]) || '#'; }
@@ -179,7 +252,7 @@ function loadLevel(i, intro = true) {
   li = i; const lv = LEVELS[i];
   M = lv.map; H = M.length; W = M[0].length;
   cv.width = W * T; cv.height = H * T;
-  total = 0;
+  total = 0; hasSpikes = M.some(r => r.includes('X'));
   M.forEach((row, y) => {
     const x = row.indexOf('S'); if (x >= 0) { sx = x; sy = y; }
     total += (row.match(/C/g) || []).length;
@@ -193,7 +266,7 @@ function showIntro() {
 }
 function resetLoop() {
   p = { x: sx + 0.5, y: sy + 0.5, air: 0, max: 0.6, f: 1 };
-  t = 0; rec = []; updateHUD();
+  t = 0; rec = []; pOpen = pOpen2 = false; updateHUD();
 }
 function updateHUD() {
   const lv = LEVELS[li];
@@ -215,7 +288,7 @@ function card(title, goal, tips, btn, act, btn2, act2) {
   if (btn2) { $('go2').textContent = btn2; card2Act = act2; }
   $('card').classList.add('show'); S = 'card';
 }
-function closeCard(act) { $('card').classList.remove('show'); S = 'play'; acc = 0; if (act) act(); }
+function closeCard(act) { sfx.start(); $('card').classList.remove('show'); S = 'play'; acc = 0; if (act) act(); }
 $('go').onclick = () => closeCard(cardAct);
 $('go2').onclick = () => closeCard(card2Act);
 
@@ -238,23 +311,23 @@ $('chill').onchange = e => { SAVE.chill = e.target.checked; persist(); if (S !==
 $('menuBtn').onclick = showMenu;
 
 // ---------- game events ----------
-function die(why) {
-  fails++; shake = 14; burst(p.x, p.y, '#ff6a00', 28); snd(120, 0.3, 'sawtooth');
+function die(why, kind) {
+  fails++; shake = 14; burst(p.x, p.y, '#ff6a00', 28); kind === 'spike' ? sfx.dieSpike() : sfx.dieLava();
   toast(why); resetLoop();
 }
 function endLoop() {
   if (S !== 'play' || t < 20 || LEVELS[li].loops < 2) return;
   ghosts.push(rec); loop++; flashA = 1;
   burst(p.x, p.y, GHOST_COLORS[(loop - 1) % 3], 24);
-  snd(300, 0.25, 'sine');
+  sfx.rewind();
   if (loop >= LEVELS[li].loops) {
-    fails++; toast('⏳ Out of loops! Same level, fresh start.'); ghosts = []; loop = 0;
+    fails++; sfx.fail(); toast('⏳ Out of loops! Same level, fresh start.'); ghosts = []; loop = 0;
   } else toast('⏪ Rewind! Your ghost is replaying.');
   resetLoop();
 }
 function nextLevel() { li + 1 < LEVELS.length ? loadLevel(li + 1) : (showMenu(), S = 'card'); }
 function win() {
-  S = 'won'; snd(660, 0.3, 'sine'); setTimeout(() => snd(880, 0.4, 'sine'), 150);
+  S = 'won'; sfx.win();
   for (let i = 0; i < 70; i++)
     burst(W / 2, H / 2, ['#ff3d81', '#ffd23f', '#38e8ff', '#22c55e'][i % 4], 1, 400);
   const left = lvTime() - t / FPS;
@@ -275,31 +348,35 @@ function step() {
   const ents = [p, ...ghosts.map(gh => gh[Math.min(t, gh.length - 1)])];
   for (const e of ents) if (e.air <= 0) { const c = tile(e.x, e.y); if (c === 'P') open = true; if (c === 'Q') open2 = true; }
 
+  if ((open && !pOpen) || (open2 && !pOpen2)) sfx.plate(1);
+  else if ((!open && pOpen) || (!open2 && pOpen2)) sfx.plate(0);
+  pOpen = open; pOpen2 = open2;
+  if (hasSpikes && !spikeOn(t) && (t % 40 === 28 || t % 40 === 32 || t % 40 === 36)) sfx.tick();
   const mx = k.right - k.left, my = k.down - k.up, n = mx && my ? 0.707 : 1;
   move(mx * n * SPEED * DT, my * n * SPEED * DT);
   if (mx) p.f = mx;
   if (p.air <= 0) {
-    if (jumpBuf > 0) { p.air = p.max = 0.6; jumpBuf = 0; snd(520, 0.12); puff(p, 6); }
-    else if (tile(p.x, p.y) === 'U') { p.air = p.max = 1.3; snd(760, 0.25, 'sine'); puff(p, 14); }
-    else if ((mx || my) && t % 8 === 0) puff(p, 1);
+    if (jumpBuf > 0) { p.air = p.max = 0.6; jumpBuf = 0; sfx.jump(); puff(p, 6); }
+    else if (tile(p.x, p.y) === 'U') { p.air = p.max = 1.3; sfx.spring(); puff(p, 14); }
+    else if ((mx || my) && t % 8 === 0) { puff(p, 1); if (t % 16 === 0) sfx.step(); }
   }
   if (jumpBuf > 0) jumpBuf--;
-  if (p.air > 0) { p.air -= DT; if (p.air <= 0) { p.air = 0; puff(p, 5); } }
+  if (p.air > 0) { p.air -= DT; if (p.air <= 0) { p.air = 0; puff(p, 5); sfx.land(); } }
 
   const c = tile(p.x, p.y), key = Math.floor(p.x) + ',' + Math.floor(p.y);
   if (c === 'C' && !coins.has(key)) {
-    coins.add(key); snd(700 + coins.size * 120, 0.12, 'sine'); burst(p.x, p.y, '#ffd23f', 12, 90); updateHUD();
+    coins.add(key); sfx.coin(coins.size); burst(p.x, p.y, '#ffd23f', 12, 90); updateHUD();
   }
   if (p.air <= 0) {
-    if (c === 'L') return die('🔥 Splash! Jump over the lava.');
-    if (c === 'X' && spikeOn(t)) return die('⚠️ Ouch! Wait until the spikes sink.');
+    if (c === 'L') return die('🔥 Splash! Jump over the lava.', 'lava');
+    if (c === 'X' && spikeOn(t)) return die('⚠️ Ouch! Wait until the spikes sink.', 'spike');
     if (c === 'E') return win();
   }
   rec.push({ x: p.x, y: p.y, air: p.air, max: p.max, f: p.f });
   t++;
   if (t >= lvTime() * FPS) endLoop2();
 }
-function endLoop2() { if (LEVELS[li].loops < 2) { fails++; toast('⏳ Time is up. Try again, you are faster now!'); resetLoop(); } else endLoop(); }
+function endLoop2() { if (LEVELS[li].loops < 2) { fails++; sfx.fail(); toast('⏳ Time is up. Try again, you are faster now!'); resetLoop(); } else endLoop(); }
 
 // ---------- drawing ----------
 function body(e, col, a, now) {
@@ -434,5 +511,6 @@ $('skip').onclick = skip;
 // start on the first level you have not finished
 let startLv = 0;
 while (startLv < LEVELS.length - 1 && (SAVE.stars[startLv] || 0) > 0) startLv++;
+soundLabels();
 loadLevel(startLv);
 requestAnimationFrame(frame);
