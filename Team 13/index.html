@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAST LIGHT — Against the Clock</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="game-container">
+    <!-- Main HTML5 Canvas -->
+    <canvas id="game-canvas" width="960" height="640"></canvas>
+
+    <!-- In-Game HUD -->
+    <div id="game-hud">
+      <div class="hud-left">
+        <div class="hud-minimap-row">
+          <!-- Dynamic Rotating Mini Map -->
+          <div id="minimap-container">
+            <canvas id="minimap-canvas" width="120" height="120"></canvas>
+            <div class="minimap-bezel-ring"></div>
+            <div class="minimap-legend-tag">ROTATING RADAR</div>
+          </div>
+
+          <div class="hud-stats-col">
+            <div class="hud-row">
+              <div class="fuel-label-group">
+                <span>LANTERN</span>
+                <span id="hud-fuel-val">120s</span>
+              </div>
+              <div class="fuel-bar-container">
+                <div id="hud-fuel-fill" class="fuel-fill normal"></div>
+              </div>
+            </div>
+            <div class="hud-row">
+              <span id="hud-fuel-rate" class="fuel-rate danger">DRAIN: 1.0x</span>
+              <span id="hud-hearts" class="hearts-display">❤️ ❤️ ❤️</span>
+            </div>
+            <!-- Old Man's Location Tracker Badge -->
+            <div class="hud-row old-man-hud-badge">
+              <span id="hud-old-man-dist">👴 WANDERER: 14m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <div class="hud-card">
+          <div id="hud-area-name" class="area-badge">The Forest Edge</div>
+          <div class="score-badge">SCORE: <span id="hud-score-val">0</span></div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="hud-btn-map" class="btn btn-secondary btn-sm">🗺️ Map [M]</button>
+          <button id="hud-btn-journal" class="btn btn-secondary btn-sm">📖 Codex [J]</button>
+        </div>
+      </div>
+
+      <!-- Active Objective Banner -->
+      <div class="hud-objective">
+        <strong>OBJECTIVE:</strong> <span id="hud-objective-text">Speak with the Old Traveler and investigate the abandoned camp.</span>
+      </div>
+
+      <!-- Controls Hint -->
+      <div class="hud-controls-hint">
+        [WASD/Arrows] Move &bull; [SHIFT] Sprint &bull; [E] Interact &bull; [SPACE] Pulse Flare &bull; [M] World Map &bull; [TAB/J] Codex &bull; [ESC] Pause
+      </div>
+    </div>
+
+    <!-- Floating Quest / Event Toast Banner -->
+    <div id="quest-toast">OBJECTIVE UPDATED</div>
+
+    <!-- MAIN MENU OVERLAY -->
+    <div id="main-menu-overlay">
+      <div class="title-container">
+        <h1 class="game-title">LAST LIGHT</h1>
+        <p class="game-subtitle">A supernatural darkness is consuming the world. You have 120 seconds of light.</p>
+      </div>
+      <div class="menu-buttons-list">
+        <button id="btn-new-game" class="btn btn-primary">Embark into the Dark</button>
+        <button id="btn-continue-game" class="btn btn-secondary disabled" disabled>Continue Journey</button>
+        <button id="btn-open-map-menu" class="btn btn-secondary">Expedition Map & Lore</button>
+        <button id="btn-how-to-play" class="btn btn-secondary">Chronicles & Controls</button>
+        <button id="btn-toggle-audio" class="btn btn-secondary">🔊 Audio Active</button>
+      </div>
+    </div>
+
+    <!-- INSTRUCTIONS / HOW TO PLAY MODAL -->
+    <div id="instructions-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog">
+        <h2 style="color: var(--accent-amber); margin-bottom: 12px;">Survival Chronicles</h2>
+        <div style="font-size: 13px; line-height: 1.6; text-align: left; color: #cbd5e1; margin-bottom: 18px;">
+          <p><strong>⏳ The Central Rule:</strong> Your ancient lantern carries only 120 seconds of usable light. When outside safe zones, fuel drains constantly.</p>
+          <br>
+          <p><strong>🔥 Managing Light:</strong> As fuel depletes, your light radius contracts, darkness thickens, and shadow entities become bolder. At 0 seconds, the light dies forever.</p>
+          <br>
+          <p><strong>🏕️ Safe Zones:</strong> Campfires and holy shrines halt fuel decay and slowly heal wounds. Rest here to study your journal.</p>
+          <br>
+          <p><strong>⚡ Lantern Pulse [SPACE]:</strong> Release a searing pulse of flame to stun creeping creatures for 2.5 seconds (costs 4 seconds of fuel).</p>
+          <br>
+          <p><strong>🧭 Controls:</strong> WASD/Arrows to walk, Shift to sprint (drains more fuel!), E to inspect, M for map, J or Tab to view lore.</p>
+        </div>
+        <button id="btn-close-instructions" class="btn btn-primary">I Am Ready</button>
+      </div>
+    </div>
+
+    <!-- PAUSE MENU MODAL -->
+    <div id="pause-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog" style="max-width: 380px;">
+        <h2 style="color: var(--accent-amber); margin-bottom: 20px;">Journey Paused</h2>
+        <div class="menu-buttons-list" style="margin: 0 auto; width: 100%;">
+          <button id="btn-resume" class="btn btn-primary">Resume</button>
+          <button id="btn-pause-world-map" class="btn btn-secondary">Expedition Map [M]</button>
+          <button id="btn-open-journal" class="btn btn-secondary">Open Journal & Satchel</button>
+          <button id="btn-save-game" class="btn btn-secondary">Save Progress</button>
+          <button id="btn-pause-menu-main" class="btn btn-secondary">Exit to Main Menu</button>
+        </div>
+        <div id="save-status-msg" style="color: var(--accent-green); font-size: 12px; margin-top: 14px;" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- JOURNAL & SATCHEL MODAL -->
+    <div id="journal-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog journal-modal-dialog">
+        <div class="journal-header">
+          <h2 style="color: var(--accent-amber); font-size: 20px;">Traveler's Chronicles & Satchel</h2>
+          <button id="btn-close-journal" class="btn btn-secondary btn-sm">Close [ESC]</button>
+        </div>
+        <div id="journal-tabs" class="journal-tabs-bar">
+          <!-- Populated dynamically: Letters, Memories, Ancient Records, Discoveries -->
+        </div>
+        <div id="journal-entries" class="journal-body">
+          <!-- Dynamic entries -->
+        </div>
+        <hr style="border-color: var(--border-dim); margin: 12px 0;">
+        <div style="text-align: left;">
+          <h4 style="color: var(--accent-amber); margin-bottom: 8px;">Carried Supplies</h4>
+          <div id="inventory-grid"></div>
+        </div>
+        <div id="quest-log-content" style="margin-top: 10px; text-align: left;"></div>
+      </div>
+    </div>
+
+    <!-- DEDICATED CENTERED EXPEDITION WORLD MAP MODAL -->
+    <div id="world-map-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog world-map-dialog">
+        <div class="world-map-modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">🗺️</span>
+            <div>
+              <h2 style="color: var(--accent-amber); font-size: 19px; margin: 0; letter-spacing: 1px;">EXPEDITION CARTOGRAPHY</h2>
+              <p style="color: var(--text-dim); font-size: 11px; margin: 0;">Multi-directional open-world realms surrounding The Forest Crossroads</p>
+            </div>
+          </div>
+          <button id="btn-close-world-map" class="btn btn-secondary btn-sm">Close [M / ESC]</button>
+        </div>
+        <div id="dedicated-world-map-content" class="dedicated-world-map-body">
+          <!-- Rendered dynamically by Journal.renderWorldMap -->
+        </div>
+      </div>
+    </div>
+
+    <!-- INTERACTIVE PUZZLE MODAL -->
+    <div id="puzzle-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog">
+        <div id="puzzle-content"></div>
+      </div>
+    </div>
+
+    <!-- DIALOGUE MODAL -->
+    <div id="dialogue-modal" class="hidden">
+      <div class="dialogue-wrapper">
+        <div class="dialogue-portrait-box">
+          <canvas id="dialogue-portrait-canvas" width="72" height="72"></canvas>
+        </div>
+        <div class="dialogue-content">
+          <div id="dialogue-speaker">Speaker</div>
+          <div id="dialogue-text">Dialogue text goes here...</div>
+          <div id="dialogue-choices"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRAMATIC EXTINCTION SEQUENCE OVERLAY -->
+    <div id="extinguish-screen" class="hidden">
+      <div id="extinguish-text"></div>
+    </div>
+
+    <!-- GAME OVER MODAL -->
+    <div id="game-over-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog" style="max-width: 440px;">
+        <h2 style="color: var(--accent-crimson); font-size: 28px; margin-bottom: 12px;">CONSUMED BY THE DARK</h2>
+        <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">
+          The flame sputtered, and the shadows claimed what was left of the light.
+        </p>
+        <div id="game-over-stats" style="margin-bottom: 20px;"></div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button id="btn-gameover-restart" class="btn btn-primary">Try Again</button>
+          <button id="btn-gameover-menu" class="btn btn-secondary">Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENDING / VICTORY MODAL -->
+    <div id="ending-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog" style="max-width: 640px;">
+        <h2 id="ending-title" style="color: var(--accent-amber); font-size: 24px; margin-bottom: 6px;">ENDING</h2>
+        <div id="ending-quote" class="ending-quote">"Quote"</div>
+        <div id="ending-desc" class="ending-desc">Epilogue</div>
+        <div id="ending-score-card"></div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button id="btn-ending-restart" class="btn btn-primary">Play Another Path</button>
+          <button id="btn-ending-menu" class="btn btn-secondary">Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLOATING REGION DISCOVERY BANNER (NON-BLOCKING CINEMATIC) -->
+    <div id="region-discovery-banner" class="region-discovery-banner hidden">
+      <div class="region-disc-stars">✦ ✦ ✦</div>
+      <div id="region-disc-title" class="region-disc-title">THE FOREST CROSSROADS</div>
+      <div id="region-disc-sub" class="region-disc-sub">Sanctuary of Oakhaven &bull; Safe Zone</div>
+      <div id="region-disc-quote" class="region-disc-quote">"Four paths diverge beneath the dying twilight..."</div>
+    </div>
+
+  </div>
+
+  <!-- Scripts in Modular Dependency Order -->
+  <script src="src/constants.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/sprites.js"></script>
+  <script src="src/collision.js"></script>
+  <script src="src/camera.js"></script>
+  <script src="src/lighting.js"></script>
+  <script src="src/player.js"></script>
+  <script src="src/enemy.js"></script>
+  <script src="src/puzzles.js"></script>
+  <script src="src/inventory.js"></script>
+  <script src="src/journal.js"></script>
+  <script src="src/quests.js"></script>
+  <script src="src/scoring.js"></script>
+  <script src="src/save.js"></script>
+  <script src="src/levels.js"></script>
+  <script src="src/story_dialogues.js"></script>
+  <script src="src/dialogue.js"></script>
+
+  <!-- Maps -->
+  <script src="maps/map1_forest_edge.js"></script>
+  <script src="maps/map2_whispering_woods.js"></script>
+  <script src="maps/map3_black_marsh.js"></script>
+  <script src="maps/map4_forgotten_ruins.js"></script>
+  <script src="maps/map5_heart_of_darkness.js"></script>
+
+  <!-- Minimap & Engine -->
+  <script src="src/minimap.js"></script>
+  <script src="src/map.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/main.js"></script>
+
+</body>
+</html>
