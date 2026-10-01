@@ -1,0 +1,284 @@
+:root{
+  --bg:#e7ecf2; --panel:#ffffff; --ink:#0d1b2a; --mut:#5a6b80;
+  --good:#12906a; --bad:#d6334a; --ice:#2a8bd8; --bar:#2f5fe8; --gold:#b87408;
+  --surge:#d9701a; --slow:#8b6cf0; --big:#14aab8; --shield:#6f82ad; --sweep:#e0457f;
+  --display:"Chakra Petch","Segoe UI",system-ui,sans-serif;
+  --body:"Rubik","Segoe UI",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#080d16; --panel:#111a2b; --ink:#e8eef8; --mut:#8a9ab3;
+    --good:#3fd1a0; --bad:#ff6b7d; --ice:#6cc4ff; --bar:#6d93ff; --gold:#f2b24c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#080d16; --panel:#111a2b; --ink:#e8eef8; --mut:#8a9ab3;
+  --good:#3fd1a0; --bad:#ff6b7d; --ice:#6cc4ff; --bar:#6d93ff; --gold:#f2b24c;
+}
+@property --ang{syntax:'<angle>'; inherits:false; initial-value:0deg}
+
+*{box-sizing:border-box}
+html{height:100%}
+body{
+  margin:0; height:100dvh; background:var(--bg); color:var(--ink);
+  font-family:var(--body);
+  display:flex; flex-direction:column; align-items:center;
+  user-select:none; -webkit-user-select:none;
+}
+button{font-family:inherit}
+
+/* ---------- Header ---------- */
+header{width:100%; max-width:960px; padding:12px 16px 4px}
+.row{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+h1{font:700 1.7rem/1 var(--display); margin:0}
+.chip{background:var(--panel); padding:3px 12px; border-radius:20px; font-weight:700; font-size:.9rem}
+.clock{display:flex; align-items:baseline; gap:10px}
+#time{min-width:4.3ch; font:700 3.2rem/1 var(--display); font-variant-numeric:tabular-nums}
+#time.low{color:var(--bad)}
+#time.frozen{color:var(--ice)}
+#fz{font-size:1.1rem; font-weight:700; color:var(--ice); font-variant-numeric:tabular-nums}
+.stats{text-align:right; font-weight:700}
+#combo{display:block; color:var(--gold); min-height:1.2em; font-size:.9rem}
+.track{height:10px; background:var(--panel); border-radius:6px; overflow:hidden; margin:6px 0}
+#fill{height:100%; width:100%; background:var(--bar); transition:width .1s linear}
+#fill.frozen{background:var(--ice)}
+.sub{color:var(--mut); font-size:.9rem; align-items:center}
+.btns{display:flex; gap:6px}
+button.small{font:inherit; color:var(--mut); background:none; border:1px solid var(--mut); border-radius:8px; padding:2px 10px; cursor:pointer}
+button.small:disabled{opacity:.4; cursor:not-allowed}
+button.small:focus-visible{outline:3px solid var(--bar)}
+
+/* ---------- Layout ---------- */
+#main{display:flex; gap:12px; flex:1; width:100%; max-width:960px; padding:0 12px; margin:8px 0 12px; min-height:0}
+#arena{position:relative; flex:1; min-width:0; background:var(--panel); border-radius:14px; overflow:hidden; touch-action:none}
+#arena.shake{animation:shake .35s}
+@keyframes shake{
+  0%,100%{transform:translate(0)} 20%{transform:translate(-7px,3px)}
+  40%{transform:translate(6px,-4px)} 60%{transform:translate(-4px,-2px)} 80%{transform:translate(3px,3px)}
+}
+#side{width:240px; flex-shrink:0; display:flex; flex-direction:column; gap:12px; overflow-y:auto}
+.panel{background:var(--panel); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px}
+.fxhead{display:flex; justify-content:space-between; font-weight:700}
+.count{background:var(--bg); border-radius:12px; padding:0 10px; font-variant-numeric:tabular-nums}
+
+/* ---------- Shards ---------- */
+.t{
+  position:absolute; border-radius:50%; border:0; cursor:pointer;
+  display:grid; place-items:center;
+  font:700 1rem var(--body); color:#fff;
+  animation:pop .15s ease-out; z-index:2;
+}
+.t.g{background:var(--good)}
+.t.b{background:var(--bad)}
+.t.p{
+  background:var(--c); font-size:1.25rem;
+  box-shadow:0 0 14px var(--c), inset 0 0 0 3px rgba(255,255,255,.5);
+  animation:pop .15s ease-out, glow 1.1s ease-in-out .15s infinite alternate;
+}
+.t.p::before{
+  content:''; position:absolute; inset:-7px; border-radius:50%;
+  border:2px dashed var(--c); animation:turn 3s linear infinite;
+  pointer-events:none;           /* fix: the ring no longer steals taps from shards underneath */
+}
+.t:focus-visible{outline:3px solid var(--ink)}
+@keyframes pop{from{transform:scale(.4)} to{transform:scale(1)}}
+@keyframes glow{from{box-shadow:0 0 8px var(--c), inset 0 0 0 3px rgba(255,255,255,.4)} to{box-shadow:0 0 26px 4px var(--c), inset 0 0 0 3px rgba(255,255,255,.7)}}
+@keyframes turn{to{transform:rotate(360deg)}}
+
+/* ---------- Hit effects ---------- */
+.float{position:absolute; font-weight:700; pointer-events:none; animation:up .7s forwards; z-index:8}
+@keyframes up{to{transform:translateY(-36px); opacity:0}}
+.pt{position:absolute; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; pointer-events:none; z-index:8; animation:fly .6s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(.2); opacity:0}}
+.ring{position:absolute; width:20px; height:20px; margin:-10px 0 0 -10px; border-radius:50%; border:3px solid; pointer-events:none; z-index:8; animation:ring .5s ease-out forwards}
+@keyframes ring{to{transform:scale(5); opacity:0}}
+
+#frost{
+  position:absolute; inset:0; pointer-events:none; z-index:4; opacity:0; transition:opacity .25s linear;
+  background:
+    radial-gradient(ellipse at center, transparent 40%, rgba(190,235,255,.6) 100%),
+    repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,.12) 0 5deg, transparent 5deg 15deg);
+  box-shadow:inset 0 0 70px 14px rgba(120,200,255,.75);
+}
+#aura{
+  position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0;
+  border-radius:inherit; padding:var(--w,3px); transition:opacity .3s; animation:spin 4s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+}
+@keyframes spin{to{--ang:360deg}}
+
+/* ---------- Unlock toast ---------- */
+#toast{
+  position:absolute; left:50%; top:14px; z-index:9; pointer-events:none; opacity:0;
+  transform:translate(-50%,-20px); transition:opacity .3s, transform .3s;
+  display:flex; align-items:center; gap:8px; white-space:nowrap;
+  background:var(--ink); color:var(--bg); font-weight:700;
+  padding:8px 16px; border-radius:30px; border:2px solid var(--c,var(--gold));
+  box-shadow:0 0 18px -2px var(--c,var(--gold));
+}
+#toast.on{opacity:1; transform:translate(-50%,0)}
+
+/* ---------- Level cleared overlay (inside arena) ---------- */
+#ov{
+  position:absolute; inset:0; z-index:6; display:none;
+  flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:24px; background:var(--panel); gap:10px;
+}
+#ov h2{font:700 clamp(2.4rem,8vw,3.6rem)/.95 var(--display); margin:0}
+#ov p{max-width:38ch; margin:0; color:var(--mut); line-height:1.45}
+
+/* ---------- Buttons ---------- */
+button.go{
+  font:700 1.05rem var(--body); padding:12px 28px; border-radius:12px; border:0;
+  background:var(--ink); color:var(--bg); cursor:pointer;
+}
+button.go.big{font-size:1.25rem; padding:15px 44px; box-shadow:0 8px 0 -2px color-mix(in srgb,var(--ink) 35%,transparent)}
+button.go:active{transform:translateY(2px)}
+button.go:focus-visible,button.ghost:focus-visible{outline:3px solid var(--bar); outline-offset:3px}
+button.ghost{font:700 1.05rem var(--body); padding:12px 22px; border-radius:12px; border:2px solid var(--ink); background:none; color:var(--ink); cursor:pointer}
+
+/* ---------- Full screens: menu, lost, won ---------- */
+#screen{
+  position:fixed; inset:0; z-index:50; display:none; overflow-y:auto;
+  padding:calc(24px + env(safe-area-inset-top,0px)) 20px calc(24px + env(safe-area-inset-bottom,0px));
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb,var(--bar) 20%, transparent), transparent 62%),
+    var(--bg);
+}
+#screen.on{display:grid; place-items:center}
+.sc{width:100%; max-width:460px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px}
+.sc h1,.sc h2{font:700 clamp(2.6rem,12vw,4.4rem)/1 var(--display); margin:0}
+.sc .sub{margin:0; color:var(--mut); line-height:1.5; max-width:38ch}
+.tip{margin:0; color:var(--mut); line-height:1.45; max-width:38ch; font-size:.95rem}
+.btnrow{display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:4px}
+.badge{background:var(--ink); color:var(--bg); border:2px solid var(--gold); border-radius:20px; padding:4px 16px; font-weight:700}
+.gap{color:var(--gold); font-weight:700}
+.legend{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; justify-content:center}
+.legend li{display:flex; align-items:center; gap:8px; background:var(--panel); border-radius:20px; padding:6px 14px; font-size:.9rem; font-weight:700}
+.dot{width:14px; height:14px; border-radius:50%; display:inline-block}
+.dot.g{background:var(--good)} .dot.b{background:var(--bad)}
+.dot.p{background:var(--gold); box-shadow:0 0 10px var(--gold)}
+.stats-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; width:100%}
+.st{background:var(--panel); border-radius:12px; padding:12px 6px}
+.st b{display:block; font:700 1.8rem/1 var(--display)}
+.st span{font-size:.8rem; color:var(--mut)}
+
+/* ---------- Clock dial ---------- */
+.dial{position:relative; width:min(50vw,210px); aspect-ratio:1}
+.dial svg{position:absolute; inset:0; width:100%; height:100%}
+.rim{fill:var(--panel); stroke:var(--ink); stroke-width:2.2}
+.ticks line{stroke:var(--ink)}
+.spin{position:absolute; inset:0; border-radius:50%; animation:sweep 5s linear infinite}
+.spin::before{content:''; position:absolute; inset:6%; border-radius:50%; background:conic-gradient(from 0deg, transparent 0 280deg, color-mix(in srgb,var(--bar) 42%, transparent) 360deg)}
+.spin::after{content:''; position:absolute; left:calc(50% - 1.5px); top:8%; width:3px; height:42%; background:var(--bad); border-radius:2px}
+.dial::after{content:''; position:absolute; left:calc(50% - 5px); top:calc(50% - 5px); width:10px; height:10px; border-radius:50%; background:var(--ink)}
+.dial b{position:absolute; left:0; right:0; top:60%; text-align:center; font:700 2rem/1 var(--display)}
+@keyframes sweep{to{transform:rotate(360deg)}}
+.dial.dead,.dial.win{animation:thud .6s}
+.dial.dead .spin,.dial.win .spin{animation:none}
+.dial.dead .spin::before{background:conic-gradient(from 0deg, transparent 0 300deg, color-mix(in srgb,var(--bad) 50%, transparent) 360deg)}
+.dial.win .spin::before{background:conic-gradient(from 0deg, transparent 0 300deg, color-mix(in srgb,var(--good) 50%, transparent) 360deg)}
+.dial.dead b{color:var(--bad)} .dial.win b{color:var(--good)}
+@keyframes thud{0%{transform:scale(1.15)} 40%{transform:scale(.95)} 100%{transform:scale(1)}}
+
+/* ---------- Active effects ---------- */
+#fx.stacked{animation:throb 1.4s ease-in-out infinite alternate}
+@keyframes throb{from{box-shadow:0 0 0 2px var(--gold), 0 0 6px var(--gold)} to{box-shadow:0 0 0 2px var(--gold), 0 0 22px var(--gold)}}
+#fxlist,#hlist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+#fxempty{margin:0; color:var(--mut); font-size:.9rem; line-height:1.4}
+#fxempty[hidden]{display:none}
+.fxrow{
+  display:grid; grid-template-columns:auto 1fr auto; gap:4px 8px; align-items:center;
+  padding:8px 10px; border-radius:10px; background:var(--bg);
+  border-left:4px solid var(--c); box-shadow:0 0 12px -3px var(--c); animation:fxin .25s ease-out;
+}
+.fxrow.bump{animation:bump .3s}
+.fxrow.out{animation:fxout .25s forwards}
+.fxrow.ending .bar i{animation:blink .45s infinite alternate}
+.fxi{font-size:1.1rem}
+.fxn{font-weight:700; font-size:.95rem}
+.fxs{color:var(--c)}
+.fxt{font-variant-numeric:tabular-nums; color:var(--mut); font-size:.9rem}
+.bar{grid-column:1 / -1; height:8px; border-radius:5px; background:rgba(127,127,127,.25); overflow:hidden}
+.bar i{display:block; height:100%; width:100%; background:var(--c); border-radius:5px; transition:width .12s linear}
+@keyframes fxin{from{opacity:0; transform:translateX(14px)}}
+@keyframes fxout{to{opacity:0; transform:scale(.85)}}
+@keyframes bump{40%{transform:scale(1.06)}}
+@keyframes blink{to{opacity:.35}}
+
+/* ---------- Hints ---------- */
+.hrow{display:grid; grid-template-columns:34px 1fr; gap:10px; align-items:start; padding:8px; border-radius:10px; background:var(--bg); border-left:4px solid var(--c); animation:fxin .3s ease-out}
+.hi{width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:var(--c); color:#fff; font-weight:700; box-shadow:0 0 10px -2px var(--c)}
+.hrow b{font-size:.95rem}
+.hrow small{display:block; color:var(--mut); line-height:1.35; margin-top:2px; font-size:.82rem}
+.hrow.lock{--c:var(--mut); opacity:.8; border-left-style:dashed}
+.hrow.lock .hi{background:transparent; border:2px dashed var(--mut); color:var(--mut); box-shadow:none}
+.new{font-style:normal; font-size:.7rem; background:var(--gold); color:var(--bg); border-radius:10px; padding:1px 8px; margin-left:6px; vertical-align:middle}
+
+/* ---------- Settings modal ---------- */
+#set{position:fixed; inset:0; z-index:60; overflow-y:auto; padding:calc(20px + env(safe-area-inset-top,0px)) 14px 30px; background:color-mix(in srgb,var(--bg) 80%, transparent); backdrop-filter:blur(6px)}
+#set[hidden]{display:none}
+.card{max-width:520px; margin:0 auto; background:var(--panel); border-radius:18px; padding:20px 22px 24px; box-shadow:0 24px 60px -24px rgba(0,0,0,.5)}
+.card h2{margin:0 0 12px; font:700 2rem/1 var(--display)}
+.presets{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap}
+.presets button{font:700 .95rem var(--body); padding:8px 16px; border-radius:20px; border:2px solid var(--ink); background:none; color:var(--ink); cursor:pointer}
+.presets button[aria-pressed="true"]{background:var(--ink); color:var(--bg)}
+.presets button:focus-visible{outline:3px solid var(--bar); outline-offset:2px}
+.ctl{display:grid; grid-template-columns:1fr auto; gap:2px 10px; margin-bottom:12px; align-items:center}
+.ctl label{font-weight:700}
+.ctl output{color:var(--mut); font-variant-numeric:tabular-nums}
+.ctl input[type=range]{grid-column:1 / -1; width:100%; accent-color:var(--bar)}
+.ctl small{grid-column:1 / -1; color:var(--mut)}
+.ctl select{grid-column:2; font:inherit; padding:4px 8px; background:var(--bg); color:var(--ink); border:1px solid var(--mut); border-radius:6px}
+.ctl input[type=checkbox]{width:20px; height:20px; accent-color:var(--bar); justify-self:end}
+.setbtns{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap}
+
+/* ---------- Small screens ---------- */
+@media (max-width:760px){
+  body{height:auto; min-height:100dvh}
+  #main{flex-direction:column}
+  #arena{height:56vh; min-height:280px; flex:none}
+  #side{width:100%; overflow:visible}
+  #fxlist,#hlist{flex-direction:row; flex-wrap:wrap}
+  #fxlist li,#hlist li{flex:1 1 200px}
+}
+@media (prefers-reduced-motion:reduce){
+  .t,.float,.pt,.ring,#aura,#fx.stacked,.fxrow,.hrow,.spin,.dial,#arena.shake{animation:none}
+  #frost,#toast{transition:none}
+}
+/* ---------- v3: glob timer ring, wider flatter side panels, cat touches ---------- */
+:root{--line:rgba(127,127,127,.22)}
+.t{overflow:visible}
+.rt{position:absolute; inset:-6px; width:calc(100% + 12px); height:calc(100% + 12px); transform:rotate(-90deg); pointer-events:none; overflow:visible}
+.rt circle{fill:none; stroke-width:5; stroke:var(--ink)}
+.rt .tr{opacity:.12}
+.rt .tm{stroke-dasharray:100; stroke-dashoffset:0}
+.t.p::before{display:none}
+#frost{background:radial-gradient(ellipse at center, rgba(190,235,255,.2) 30%, rgba(190,235,255,.7) 100%), repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,.12) 0 5deg, transparent 5deg 15deg); box-shadow:inset 0 0 90px 24px rgba(120,200,255,.85)}
+#rw{display:flex; align-items:center; justify-content:flex-end; gap:5px; font-size:.8rem; color:var(--mut); margin-top:2px}
+#rw i{width:10px; height:10px; border-radius:50%; border:2px solid var(--gold)}
+#rw i.on{background:var(--gold)}
+.panel{border:1px solid var(--line); border-radius:16px; padding:16px; gap:4px}
+.fxhead{font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); margin-bottom:6px}
+.count{background:none; border:1px solid var(--line); font-size:.75rem; padding:0 8px}
+#hlist{gap:0}
+.hrow{grid-template-columns:36px 1fr; gap:12px; padding:12px 0; background:none; border:0; border-top:1px solid var(--line); border-radius:0; animation:none}
+.hrow:first-child{border-top:0}
+.hi{width:36px; height:36px; background:color-mix(in srgb,var(--c) 16%,transparent); color:var(--ink); box-shadow:none; font-size:1.05rem}
+.hrow b{font-size:1rem}
+.hrow small{font-size:.88rem; line-height:1.45; margin-top:3px}
+.fxrow{background:none; box-shadow:none; border:1px solid var(--line); border-left:3px solid var(--c)}
+#fx.stacked{animation:none}
+.dial{margin-top:28px}
+.dial svg.ears{inset:auto; top:-17%; height:auto; overflow:visible}
+.ears path{fill:var(--panel); stroke:var(--ink); stroke-width:2.2; stroke-linejoin:round}
+@media (min-width:761px){
+  header,#main{max-width:1080px}
+  #side{width:320px; gap:14px}
+}
+
+:root{--wind:#c26bd1}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Beat the Clock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="row">
+      <h1>Beat the Clock</h1>
+      <span class="chip" id="level">Level 1</span>
+    </div>
+    <div class="row">
+      <div class="clock"><span id="time">15.0</span><span id="fz"></span></div>
+      <div class="stats">
+        <span id="points">0 pts</span>
+        <span id="combo"></span>
+        <div id="rw"></div>
+      </div>
+    </div>
+    <div class="track"><div id="fill"></div></div>
+    <div class="row sub">
+      <span id="goal">0 / 15</span>
+      <span id="best">Best: 0</span>
+      <span class="btns">
+        <button class="small" id="pauseBtn" disabled>Pause</button>
+        <button class="small" id="mute" aria-label="Toggle sound">Sound on</button>
+        <button class="small" id="settingsBtn">Settings</button>
+      </span>
+    </div>
+  </header>
+
+  <main id="main">
+    <div id="arena">
+      <div id="frost"></div>
+      <div id="aura"></div>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <div id="ov"></div>
+    </div>
+
+    <div id="side">
+      <aside class="panel" id="fx" aria-label="Active effects">
+        <div class="fxhead"><span>Active effects</span><span class="count" id="fxcount">0</span></div>
+        <ul id="fxlist"></ul>
+        <p id="fxempty">None yet. Tap glowing globs to power up.</p>
+      </aside>
+      <aside class="panel" id="hints" aria-label="Hints">
+        <div class="fxhead"><span>Hints</span><span class="count" id="hcount">2</span></div>
+        <ul id="hlist"></ul>
+      </aside>
+    </div>
+  </main>
+
+  <div id="screen"></div>
+  <div id="set" hidden></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
